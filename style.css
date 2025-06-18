@@ -114,10 +114,13 @@ aside {
     margin-top: 0;
     font-size: 1.8em;
     font-weight: 700;
-    color: #eee; /* Brighter grey */
-    border-bottom: 2px solid rgba(46, 204, 113, 0.5); /* Green accent */
+    color: #eee;
+    border-bottom: 2px solid rgba(46, 204, 113, 0.5);
     padding-bottom: 10px;
     margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
 /* Player Cards */
@@ -129,7 +132,7 @@ aside {
 }
 
 .player-card {
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    background: #282828; /* Solid dark grey for bench cards */
     border-radius: 12px;
     padding: 15px;
     display: flex;
@@ -139,6 +142,7 @@ aside {
     transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    position: relative; /* Ensure positioning context for children */
 }
 
 .player-card:hover {
@@ -147,38 +151,41 @@ aside {
 }
 
 .player-card.on-field {
-    background: #282828; /* Dark grey base for rested state */
-    position: relative; /* Needed for the fatigue bar positioning */
+    background-color: #2ecc71; /* Initial green state */
+    transition: background-color 1s linear;
 }
 
-/* Fatigue Gradient */
-.fatigue-bar {
+/* New Satin Overlay Effect - now only for on-field cards */
+.player-card.on-field::before {
+    content: '';
     position: absolute;
     top: 0;
     left: 0;
+    width: 100%;
     height: 100%;
+    background: linear-gradient(165deg, rgba(255,255,255,0.1), rgba(255,255,255,0) 50%);
     border-radius: 12px;
-    opacity: 0.7;
-    background: linear-gradient(to right, #2ecc71, #27ae60);
-    width: var(--fatigue-percent, 0%);
-    transition: width 1s linear, background-color 1s linear;
-    z-index: 0;
+    z-index: 1;
 }
 
-@keyframes flashGreenAndWhite {
-    0%, 100% { box-shadow: 0 0 12px 6px rgba(46, 204, 113, 0.9); }
+/* Remove old fatigue bar styles */
+.fatigue-bar {
+   display: none;
+}
+
+@keyframes flashRedAndWhite {
+    0%, 100% { box-shadow: 0 0 12px 6px rgba(220, 53, 69, 0.9); }
     50% { box-shadow: 0 0 12px 6px rgba(255, 255, 255, 0.9); }
 }
 
 .player-card.fatigued {
-    animation: flashGreenAndWhite 1s infinite;
+    animation: flashRedAndWhite 1s infinite;
 }
-
 
 /* Player Card Content */
 .player-card-content {
     position: relative;
-    z-index: 1;
+    z-index: 2; /* Ensure content is above the satin overlay */
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -308,9 +315,18 @@ aside {
     gap: 15px;
 }
 
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
 .stat-item strong {
     font-size: 1.1em;
     color: #aaa;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 .stat-item p {
     font-size: 1.3em;
@@ -469,6 +485,25 @@ aside {
     margin: 0 0 25px 0;
 }
 
+.modal-input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 25px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: #f0f0f0;
+    font-size: 1.2em;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.modal-input:focus {
+    outline: none;
+    border-color: rgba(46, 204, 113, 1);
+    box-shadow: 0 0 10px rgba(46, 204, 113, 0.5);
+}
+
 .modal-actions {
     display: flex;
     justify-content: center;
@@ -494,4 +529,77 @@ aside {
 .modal-button:hover {
     transform: translateY(-3px);
     box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+/* Lucide Icon Styling */
+.lucide {
+    stroke-width: 2.5px;
+    height: 1em;
+    width: 1em; /* Ensures icons are sized relative to font-size */
+}
+
+/* Spacing fix for specific icons */
+.timer-controls .lucide,
+.stat-item .lucide,
+.tab-button .lucide {
+    margin-right: 8px;
+}
+
+/* --- Responsive Design for Mobile --- */
+@media (max-width: 900px) {
+    #root {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto;
+        grid-template-areas:
+            "header"
+            "main"
+            "sidebar";
+        height: auto;
+        padding: 10px;
+    }
+
+    .header {
+        flex-direction: column;
+        gap: 10px;
+        padding: 10px 0;
+    }
+    
+    .logo-background {
+        padding: 10px;
+    }
+
+    .header-logo {
+        height: 60px;
+    }
+
+    .header-title {
+        font-size: 2.5em;
+    }
+
+    .panel {
+        padding: 15px;
+    }
+
+    .panel h2 {
+        font-size: 1.5em;
+        margin-bottom: 15px;
+    }
+
+    .player-cards-container {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 10px;
+    }
+
+    .timer {
+        font-size: 3em;
+    }
+
+    .tabs {
+        margin-bottom: 15px;
+    }
+
+    .tab-button {
+        padding: 10px 8px;
+        font-size: 0.9em;
+    }
 } 

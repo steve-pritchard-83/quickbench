@@ -1,0 +1,497 @@
+/* General Body & Background Styling */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: url('background.jpg') no-repeat center center fixed;
+    background-size: cover;
+    color: #f0f0f0;
+    margin: 0;
+    overflow-x: hidden;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(10, 10, 10, 0.7); /* Dark grey overlay */
+    backdrop-filter: blur(8px); /* Removed saturation */
+    z-index: -1;
+}
+
+/* Main Layout */
+#root {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+        "header header"
+        "main   sidebar";
+    gap: 20px;
+    padding: 20px;
+    max-width: 1600px;
+    margin: 0 auto;
+    height: calc(100vh - 40px);
+}
+
+.header {
+    grid-area: header;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 30px;
+    padding: 15px 0;
+    background: rgba(15, 15, 15, 0.6);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.logo-background {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    padding: 10px; /* Less padding */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+}
+
+.logo-background:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: scale(1.05);
+}
+
+.header-logo {
+    height: 120px; /* Bigger logo */
+    width: auto;
+    filter: drop-shadow(0 0 20px rgba(46, 204, 113, 0.7));
+}
+
+.header-title {
+    font-size: 4.5em;
+    font-weight: 800;
+    color: #fff;
+    opacity: 1;
+    text-shadow: 0 0 10px rgba(46, 204, 113, 0.7), 0 0 25px rgba(46, 204, 113, 0.5);
+}
+
+main {
+    grid-area: main;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+aside {
+    grid-area: sidebar;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Glass Panel Base Style */
+.panel {
+    background: rgba(25, 25, 25, 0.5); /* Greyscale glass */
+    backdrop-filter: blur(15px); /* Removed saturation */
+    border-radius: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    padding: 25px;
+    display: flex;
+    flex-direction: column;
+}
+
+#field, #bench {
+    flex-grow: 1;
+}
+
+.panel h2 {
+    margin-top: 0;
+    font-size: 1.8em;
+    font-weight: 700;
+    color: #eee; /* Brighter grey */
+    border-bottom: 2px solid rgba(46, 204, 113, 0.5); /* Green accent */
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+/* Player Cards */
+.player-cards-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 15px;
+    align-content: start; /* This is key to prevent stretching */
+}
+
+.player-card {
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    border-radius: 12px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    cursor: grab;
+    transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.player-card:hover {
+    box-shadow: 0 12px 28px rgba(0,0,0,0.3);
+    border-color: rgba(46, 204, 113, 0.7);
+}
+
+.player-card.on-field {
+    background: #282828; /* Dark grey base for rested state */
+    position: relative; /* Needed for the fatigue bar positioning */
+}
+
+/* Fatigue Gradient */
+.fatigue-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    border-radius: 12px;
+    opacity: 0.7;
+    background: linear-gradient(to right, #2ecc71, #27ae60);
+    width: var(--fatigue-percent, 0%);
+    transition: width 1s linear, background-color 1s linear;
+    z-index: 0;
+}
+
+@keyframes flashGreenAndWhite {
+    0%, 100% { box-shadow: 0 0 12px 6px rgba(46, 204, 113, 0.9); }
+    50% { box-shadow: 0 0 12px 6px rgba(255, 255, 255, 0.9); }
+}
+
+.player-card.fatigued {
+    animation: flashGreenAndWhite 1s infinite;
+}
+
+
+/* Player Card Content */
+.player-card-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: 100%;
+}
+
+.player-name {
+    font-size: 1.3em;
+    font-weight: 700;
+}
+
+.player-number {
+    font-size: 1em;
+    color: #ccc;
+    font-weight: 600;
+}
+
+.player-stats {
+    font-size: 0.9em;
+    margin-top: auto; /* Pushes stats and button to the bottom */
+}
+
+.score-button {
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: none;
+    background: linear-gradient(145deg, #27ae60, #229954);
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.score-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+.score-button:disabled {
+    background: #555;
+    cursor: not-allowed;
+    opacity: 0.6;
+    transform: none;
+    box-shadow: none;
+}
+
+
+/* Sidebar Tabs */
+.tabs {
+    display: flex;
+    background: rgba(10, 10, 20, 0.3);
+    border-radius: 12px;
+    padding: 5px;
+    margin-bottom: 20px;
+}
+
+.tab-button {
+    flex: 1;
+    padding: 12px 10px;
+    border: none;
+    background: transparent;
+    color: #ccc;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.tab-button.active {
+    background: #27ae60;
+    color: #fff;
+    text-shadow: 0 0 5px rgba(255,255,255,0.5);
+}
+
+.tab-content {
+    display: none; /* Hidden by default */
+}
+
+.tab-content.active {
+    display: block; /* Shown when active */
+}
+
+/* Timer and Controls */
+#timer-score, #stats-panel, #log-panel {
+    flex-grow: 1;
+}
+
+.timer {
+    font-size: 4em;
+    font-weight: 700;
+    text-align: center;
+    margin: 20px 0;
+    color: #fff;
+    text-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+}
+
+.timer-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.timer-controls button {
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.1);
+    color: #f0f0f0;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.timer-controls button:hover {
+    background: rgba(46, 204, 113, 0.7);
+    border-color: rgba(46, 204, 113, 1);
+}
+
+/* Stats and Log */
+.stats-grid, .log-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.stat-item strong {
+    font-size: 1.1em;
+    color: #aaa;
+}
+.stat-item p {
+    font-size: 1.3em;
+    margin: 5px 0 0;
+    color: #fff;
+}
+
+.activity-log {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 400px;
+    overflow-y: auto;
+    font-size: 0.95em;
+}
+
+.activity-log li {
+    padding: 8px 5px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(46, 204, 113, 0.8);
+}
+
+/* --- Responsive Design for Mobile --- */
+@media (max-width: 900px) {
+    #root {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto;
+        grid-template-areas:
+            "header"
+            "main"
+            "sidebar";
+        height: auto;
+        padding: 10px;
+    }
+
+    .header {
+        flex-direction: column;
+        gap: 10px;
+        padding: 10px 0;
+    }
+    
+    .logo-background {
+        padding: 10px;
+    }
+
+    .header-logo {
+        height: 60px;
+    }
+
+    .header-title {
+        font-size: 2.5em;
+    }
+
+    .panel {
+        padding: 15px;
+    }
+
+    .panel h2 {
+        font-size: 1.5em;
+        margin-bottom: 15px;
+    }
+
+    .player-cards-container {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 10px;
+    }
+
+    .timer {
+        font-size: 3em;
+    }
+
+    .tabs {
+        margin-bottom: 15px;
+    }
+
+    .tab-button {
+        padding: 10px 8px;
+        font-size: 0.9em;
+    }
+}
+
+/* --- Goal Explosion Effect --- */
+.player-card.exploding::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border-radius: 12px;
+    animation: ripple-explosion 0.7s ease-out;
+}
+
+@keyframes ripple-explosion {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.1);
+    }
+    50% {
+        box-shadow: 0 0 20px 40px rgba(46, 204, 113, 0.5);
+    }
+    100% {
+        transform: scale(1.2);
+        box-shadow: 0 0 40px 80px rgba(46, 204, 113, 0);
+    }
+}
+
+/* --- Custom Modal Styling --- */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(5px);
+    z-index: 10000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.modal-backdrop.visible {
+    opacity: 1;
+}
+
+.modal {
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+}
+
+.modal-text {
+    font-size: 1.2em;
+    margin: 0 0 25px 0;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+
+.modal-button {
+    padding: 10px 25px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.1);
+    color: #f0f0f0;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.modal-button.primary {
+    background: rgba(46, 204, 113, 0.8);
+    border-color: rgba(46, 204, 113, 1);
+}
+
+.modal-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+} 

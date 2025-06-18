@@ -14,7 +14,7 @@
             <div class="logo-background">
                 <img src="logo.png" alt="QuickBench Logo" class="header-logo">
             </div>
-            <div class="header-title">QuickBench</div>
+            <h1 class="header-title" id="team-name" contenteditable="true">My Team</h1>
         </header>
 
         <main>
@@ -41,6 +41,9 @@
 
             <div id="stats" class="tab-content">
                  <div id="stats-panel"></div>
+                 <div class="export-controls">
+                    <button id="export-pdf-button"><i data-lucide="file-down"></i><span>Export to PDF</span></button>
+                 </div>
             </div>
 
             <div id="log" class="tab-content">
@@ -49,8 +52,16 @@
         </aside>
     </div>
 
+    <div id="audio-container">
+        <audio id="sound-whistle" src="whistle.wav" preload="auto"></audio>
+        <audio id="sound-swoosh" src="swoosh.wav" preload="auto"></audio>
+        <audio id="sound-cheer" src="cheer.wav" preload="auto"></audio>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/fireworks-js@2.10.2/dist/fireworks.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

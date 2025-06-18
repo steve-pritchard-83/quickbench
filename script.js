@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const timerScoreEl = document.getElementById('timer-score');
     const statsPanelEl = document.getElementById('stats-panel');
     const logPanelEl = document.getElementById('log-panel');
+    const teamNameEl = document.getElementById('team-name');
 
     // Default initial state
     const initialPlayers = Array.from({ length: 8 }, (_, i) => ({
@@ -15,7 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
         goals: 0,
         onField: false,
         fatigue: 0,
-        lastBenchTime: Date.now()
+        lastBenchTime: Date.now(),
+        onFire: false,
+        recentGoals: []
     }));
 
     let players, activityLog, quarterTimer, quarter;
@@ -24,7 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- DATA PERSISTENCE ---
     function saveDataToLocal() {
-        const appState = { players, activityLog, quarterTimer, quarter };
+        const teamName = teamNameEl.textContent;
+        const appState = { players, activityLog, quarterTimer, quarter, teamName };
         localStorage.setItem('quickBenchState', JSON.stringify(appState));
     }
 
@@ -36,12 +40,23 @@ document.addEventListener('DOMContentLoaded', () => {
             activityLog = parsedState.activityLog;
             quarterTimer = parsedState.quarterTimer;
             quarter = parsedState.quarter;
+            teamNameEl.textContent = parsedState.teamName || 'My Team';
+
+            // Check if the timer was running when the app was closed.
+            // A simple proxy for this is if the timer is not at its default start time and not 0.
+            if (quarterTimer > 0 && quarterTimer < 600) {
+                 // We don't want to auto-start, but we need to reflect a paused state.
+                 // The render() call will correctly set the disabled states on the buttons.
+                 timerInterval = null; // Ensure it's treated as paused.
+            }
+
         } else {
             // No saved data, use initial state
             players = JSON.parse(JSON.stringify(initialPlayers));
             activityLog = [];
             quarterTimer = 600;
             quarter = 1;
+            teamNameEl.textContent = 'My Team';
         }
     }
 
@@ -74,6 +89,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- AUDIO & HAPTICS ---
+    function playSound(id) {
+        const sound = document.getElementById(id);
+        if (sound) {
+            sound.currentTime = 0;
+            sound.play().catch(e => console.error(`Could not play sound: ${id}`, e));
+        }
+    }
+
+    function triggerHapticFeedback(pattern = 50) {
+        if ('vibrate' in navigator) {
+            navigator.vibrate(pattern);
+        }
+    }
+
     function render() {
         renderBench();
         renderField();
@@ -93,8 +123,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
+        // Save team name on edit
+        teamNameEl.addEventListener('blur', saveDataToLocal);
+
         // Always call this after rendering to process new icons
         lucide.createIcons();
+
+        // Attach PDF export button listener
+        document.getElementById('export-pdf-button').addEventListener('click', exportStatsToPDF);
     }
 
     function createPlayerCard(player) {
@@ -102,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const displayName = player.number ? `Player No. ${player.number}` : 'Player No. #';
 
         return `
-            <div class="player-card ${player.onField ? 'on-field' : ''} ${isFatigued ? 'fatigued' : ''}" data-id="${player.id}">
+            <div class="player-card ${player.onField ? 'on-field' : ''} ${isFatigued ? 'fatigued' : ''} ${player.onFire ? 'on-fire' : ''}" data-id="${player.id}" draggable="true">
                 <div class="player-card-content">
                     <div class="player-name">${displayName}</div>
                     <div class="player-stats">
@@ -138,6 +174,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     card.style.backgroundColor = getFatigueColor(player.fatigue);
                     // Update fatigue class
                     card.classList.toggle('fatigued', player.fatigue >= 30);
+                    // Update on-fire class
+                    card.classList.toggle('on-fire', player.onFire);
                 }
             }
         });
@@ -157,22 +195,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalGoals = players.reduce((sum, p) => sum + p.goals, 0);
         const minutes = Math.floor(quarterTimer / 60);
         const seconds = quarterTimer % 60;
+        const fieldPlayersCount = players.filter(p => p.onField).length;
+        const isTimerRunning = timerInterval !== null;
 
         timerScoreEl.innerHTML = `
             <h3>Quarter: ${quarter}</h3>
             <div class="timer">${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}</div>
             <h3>Total Goals: ${totalGoals}</h3>
             <div class="timer-controls">
-                <button id="start-timer"><i data-lucide="play-circle"></i><span>Start</span></button>
-                <button id="pause-timer"><i data-lucide="pause-circle"></i><span>Pause</span></button>
-                <button id="reset-timer"><i data-lucide="rotate-cw"></i><span>Reset Qtr</span></button>
+                <button id="start-timer" ${fieldPlayersCount < 4 || isTimerRunning ? 'disabled' : ''}><i data-lucide="play-circle"></i><span>Start</span></button>
+                <button id="pause-timer" ${!isTimerRunning ? 'disabled' : ''}><i data-lucide="pause-circle"></i><span>Pause</span></button>
+                <button id="new-game-button"><i data-lucide="power-off"></i><span>New Game</span></button>
                 <button id="undo-button"><i data-lucide="undo-2"></i><span>Undo</span></button>
             </div>
         `;
 
         document.getElementById('start-timer').addEventListener('click', startTimer);
         document.getElementById('pause-timer').addEventListener('click', pauseTimer);
-        document.getElementById('reset-timer').addEventListener('click', resetTimer);
+        document.getElementById('new-game-button').addEventListener('click', resetGame);
         document.getElementById('undo-button').addEventListener('click', undoLastAction);
     }
 
@@ -200,6 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${activityLog.map(log => `<li>${log.message}</li>`).join('')}
             </ul>
         `;
+        logPanelEl.scrollTop = logPanelEl.scrollHeight;
     }
 
     function setupTabs() {
@@ -221,268 +262,426 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function setupDragAndDrop() {
+        let draggedPlayerId = null;
+
+        document.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('player-card')) {
+                draggedPlayerId = parseInt(e.target.dataset.id);
+                setTimeout(() => {
+                    e.target.classList.add('dragging');
+                }, 0);
+            }
+        });
+
+        document.addEventListener('dragend', (e) => {
+            if (e.target.classList.contains('player-card')) {
+                e.target.classList.remove('dragging');
+                draggedPlayerId = null;
+            }
+        });
+
+        const dropZones = [fieldPlayersEl, benchPlayersEl];
+        dropZones.forEach(zone => {
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                zone.classList.add('drag-over');
+            });
+
+            zone.addEventListener('dragleave', () => {
+                zone.classList.remove('drag-over');
+            });
+
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                zone.classList.remove('drag-over');
+                if (draggedPlayerId === null) return;
+                
+                const targetZoneId = zone.parentElement.id; // 'field' or 'bench'
+                const player = players.find(p => p.id === draggedPlayerId);
+
+                if (targetZoneId === 'field' && !player.onField) {
+                    movePlayerToFieldWithChecks(player);
+                } else if (targetZoneId === 'bench' && player.onField) {
+                    movePlayerToBench(player);
+                }
+                draggedPlayerId = null;
+            });
+        });
+    }
+
     function togglePlayerFieldStatus(playerId) {
         const player = players.find(p => p.id === playerId);
-        const fieldPlayers = players.filter(p => p.onField);
-
         if (player.onField) {
-            saveStateToHistory();
-            player.onField = false;
-            player.fatigue = 0;
-            player.lastBenchTime = Date.now();
-            logActivity(`Player #${player.number} moved to the bench.`);
-            const playerToSub = findLongestBenchedPlayer();
-            if (playerToSub) {
-                const subMsg = playerToSub.number ? `Player #${playerToSub.number}` : 'unassigned player';
-                setTimeout(() => showModal(`Suggestion: Bring in ${subMsg}. They have been on the bench the longest.`, 'alert'), 100);
-            }
-            render();
-            saveDataToLocal();
+            movePlayerToBench(player);
         } else {
-            // Player is moving TO the field
-            if (fieldPlayers.length >= 4) {
-                showModal("The field already has 4 players. Bench a player first.", 'alert');
-                return;
-            }
+            movePlayerToFieldWithChecks(player);
+        }
+    }
 
-            // If player number is not set, prompt for it
-            if (player.number === null) {
-                showModal('Assign a number to this player:', 'prompt', (confirmed, number) => {
-                    if (confirmed) {
-                        const newNumber = parseInt(number, 10);
-                        const isNumberInUse = players.some(p => p.number === newNumber);
-
-                        if (!newNumber || isNaN(newNumber)) {
-                            showModal('Invalid number. Please enter a valid player number.', 'alert');
-                            return;
-                        }
-                        if (isNumberInUse) {
-                            showModal(`Player number ${newNumber} is already in use.`, 'alert');
-                            return;
-                        }
-
-                        // Number is valid and unique, proceed
-                        saveStateToHistory();
-                        player.number = newNumber;
+    function movePlayerToFieldWithChecks(player) {
+        const fieldPlayers = players.filter(p => p.onField);
+        if (fieldPlayers.length >= 4) {
+            showModal("The field already has 4 players. Bench a player first.", 'alert');
+            return;
+        }
+        if (player.number === null) {
+            showModal('Assign a number to this player:', 'prompt', (confirmed, number) => {
+                if (confirmed && number) {
+                    const isUnique = !players.some(p => p.number === number);
+                    if (isUnique) {
+                        player.number = number;
                         movePlayerToField(player);
+                    } else {
+                        showModal('This jersey number is already taken. Please choose another.', 'alert');
                     }
-                    // If cancelled, do nothing
-                });
-            } else {
-                // Player already has a number, just move them
-                saveStateToHistory();
-                movePlayerToField(player);
-            }
+                }
+            });
+        } else {
+            movePlayerToField(player);
+        }
+    }
+    
+    function movePlayerToBench(player) {
+        saveStateToHistory();
+        player.onField = false;
+        player.fatigue = 0;
+        player.lastBenchTime = Date.now();
+        logActivity(`Player #${player.number || '?'} moved to the bench.`);
+        playSound('sound-swoosh');
+        triggerHapticFeedback(50);
+        render();
+        saveDataToLocal();
+        
+        const playerToSub = findLongestBenchedPlayer();
+        if (playerToSub) {
+            const subMsg = playerToSub.number ? `Player #${playerToSub.number}` : 'unassigned player';
+            setTimeout(() => showModal(`Suggestion: Bring in ${subMsg}. They have been on the bench the longest.`, 'alert'), 100);
         }
     }
 
     function movePlayerToField(player) {
+        saveStateToHistory();
         player.onField = true;
+        player.fatigue = 0;
         logActivity(`Player #${player.number} moved to the field.`);
-        
-        const newFieldCount = players.filter(p => p.onField).length;
-        if (newFieldCount === 4 && timerInterval === null && quarterTimer === 600) {
-            setTimeout(() => {
-                showModal('The field is full. Ready to start the quarter?', 'confirm', (confirmed) => {
-                    if (confirmed) startTimer();
-                });
-            }, 200);
-        }
+        playSound('sound-swoosh');
+        triggerHapticFeedback(50);
         render();
         saveDataToLocal();
     }
 
     function findLongestBenchedPlayer() {
         const benchedPlayers = players.filter(p => !p.onField);
-        if (benchedPlayers.length === 0) return null;
-        return benchedPlayers.sort((a, b) => a.lastBenchTime - b.lastBenchTime)[0];
+        return benchedPlayers.length > 0 ? benchedPlayers.sort((a, b) => a.lastBenchTime - b.lastBenchTime)[0] : null;
     }
 
     function scoreGoal(playerId) {
-        const player = players.find(p => p.id === playerId);
-        if (!timerInterval || !player.onField) {
-            return;
-        }
-
         saveStateToHistory();
-        
-        player.goals++;
-        logActivity(`${player.name} scored a goal!`);
-        
-        // --- Trigger Visual Effects ---
-        const card = document.querySelector(`.player-card[data-id="${playerId}"]`);
-        if (card) {
-            // 1. Explosion
-            card.classList.add('exploding');
-            card.addEventListener('animationend', () => {
-                card.classList.remove('exploding');
-            }, { once: true });
+        const player = players.find(p => p.id === playerId);
+        if (player && player.onField) {
+            player.goals += 1;
+            player.recentGoals.push(quarterTimer);
+            checkOnFireState(player);
+            logActivity(`Goal scored by Player #${player.number}! ${player.onFire ? 'They are on fire!' : ''}`);
+            playSound('sound-cheer');
+            triggerHapticFeedback([100, 50, 100]);
 
-            // 2. Fireworks
-            requestAnimationFrame(() => {
+            const card = document.querySelector(`.player-card[data-id="${playerId}"]`);
+            if (card) {
                 const rect = card.getBoundingClientRect();
-                const x = (rect.left + rect.width / 2) / window.innerWidth * 100;
-                const y = (rect.top + rect.height / 2) / window.innerHeight * 100;
-                triggerFireworks(x, y);
-            });
-        }
-        
-        // Manually update the DOM to avoid re-rendering and killing the animation
-        const goalStatEl = card.querySelector('.player-stats div:last-child');
-        if (goalStatEl) {
-            goalStatEl.innerText = `Goals: ${player.goals}`;
-        }
-        renderTimerAndScore(); // Updates total goals
-        renderStats(); // Updates most goals leader
+                const x = (rect.left + rect.right) / 2 / window.innerWidth;
+                const y = (rect.top + rect.bottom) / 2 / window.innerHeight;
+                
+                card.classList.add('exploding');
+                setTimeout(() => card.classList.remove('exploding'), 500);
 
-        saveDataToLocal();
+                requestAnimationFrame(() => {
+                    setTimeout(() => triggerFireworks(x, y), 50);
+                });
+
+                // Manually update stats instead of full re-render to preserve animations
+                const goalStatEl = card.querySelector('[data-stat="goals"] span');
+                if (goalStatEl) {
+                    goalStatEl.innerText = `Goals: ${player.goals}`;
+                }
+            }
+            
+            renderTimerAndScore(); // Update total goals
+            renderStats(); // Update leaderboard
+            lucide.createIcons(); // Re-process icons in updated stats panels
+            saveDataToLocal();
+        }
+    }
+
+    function checkOnFireState(player) {
+        const twoMinutesInSeconds = 120; // 2 minutes
+        const now = quarterTimer;
+    
+        // Filter out goals scored more than 2 minutes ago
+        player.recentGoals = player.recentGoals.filter(goalTime => (goalTime - now) < twoMinutesInSeconds);
+    
+        // Check if player has scored 3 or more goals recently
+        if (player.recentGoals.length >= 3) {
+            if (!player.onFire) {
+                player.onFire = true;
+                // The on-fire state will be rendered in the next updatePlayerCards call
+            }
+            // Reset cooldown since they just scored
+            player.onFireCooldown = 30; 
+        }
     }
 
     function triggerFireworks(x, y) {
-        if (typeof Fireworks === 'undefined') {
-            console.error('Fireworks.js library not loaded.');
-            return;
-        }
         const container = document.getElementById('fireworks-container');
+        if (!container) return;
         const fireworks = new Fireworks.default(container, {
-            rocketsPoint: { x: x, y: y },
-            hue: { min: 0, max: 360 },
-            delay: { min: 15, max: 30 },
-            speed: 2,
-            acceleration: 1.05,
-            friction: 0.95,
-            gravity: 1.5,
-            particles: 50,
-            trace: 3,
-            explosion: 5,
-            autoresize: true,
-            brightness: { min: 50, max: 80, decay: { min: 0.015, max: 0.03 } }
+            maxRockets: 3,
+            rocketSpawnInterval: 150,
+            numParticles: 100,
+            explosionMinHeight: 0.2,
+            explosionMaxHeight: 0.9,
+            explosionChance: 0.08,
+            x: x * 100,
+            y: y * 100,
         });
         fireworks.start();
-        setTimeout(() => fireworks.stop(), 3000);
+        setTimeout(() => fireworks.stop(), 2000);
     }
 
     function logActivity(message) {
-        activityLog.unshift({ time: new Date(), message });
-        if (activityLog.length > 20) {
-            activityLog.pop();
-        }
+        const now = new Date();
+        const timestamp = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+        activityLog.unshift({ time: timestamp, message: message });
+        if (activityLog.length > 50) activityLog.pop();
         renderLog();
+        logPanelEl.scrollTop = 0;
     }
 
     function gameTick() {
+        let hasChanges = false;
         if (quarterTimer > 0) {
             quarterTimer--;
             players.forEach(p => {
                 if (p.onField) {
                     p.totalTimeOnField++;
-                    if (p.fatigue < 30) {
-                        p.fatigue++;
+                    p.fatigue++;
+                }
+                 // Handle "On-Fire" cooldown
+                if (p.onFire) {
+                    p.onFireCooldown = (p.onFireCooldown || 30) - 1;
+                    if (p.onFireCooldown <= 0) {
+                        p.onFire = false;
+                        p.recentGoals = []; // Reset recent goals
+                        logActivity(`Player #${p.number} has cooled down.`);
                     }
                 }
             });
-            // Instead of a full re-render, just update dynamic elements
-            renderTimerAndScore();
-            updatePlayerCards();
+            hasChanges = true;
         } else {
-            pauseTimer();
-            logActivity(`End of Quarter ${quarter}.`);
-            quarter++;
+            if (timerInterval) {
+                pauseTimer(false);
+                logActivity(`End of Quarter ${quarter}.`);
+                showModal(`Quarter ${quarter} has ended.`, 'alert', () => {
+                    quarter++;
+                    quarterTimer = 600;
+                    render();
+                    saveDataToLocal();
+                });
+            }
+        }
+        if(hasChanges) {
+             renderTimerAndScore();
+             updatePlayerCards();
         }
     }
 
     function startTimer() {
-        if (timerInterval) return;
-        saveStateToHistory();
-        timerInterval = setInterval(gameTick, 1000);
-        logActivity('Timer started.');
-        render();
-        saveDataToLocal();
+        if (!timerInterval) {
+            saveStateToHistory();
+            timerInterval = setInterval(gameTick, 1000);
+            logActivity('Quarter started.');
+            playSound('sound-whistle');
+            render();
+            saveDataToLocal();
+        }
     }
 
     function pauseTimer(saveHistory = true) {
-        if(saveHistory) saveStateToHistory();
-        clearInterval(timerInterval);
-        timerInterval = null;
-        logActivity('Timer paused.');
-        render();
-        saveDataToLocal();
+        if(timerInterval) {
+            if(saveHistory) saveStateToHistory();
+            clearInterval(timerInterval);
+            timerInterval = null;
+            logActivity('Timer paused.');
+            render();
+            saveDataToLocal();
+        }
     }
 
-    function resetTimer() {
-        saveStateToHistory();
-        if (timerInterval) pauseTimer(false);
-        players = JSON.parse(JSON.stringify(initialPlayers));
-        activityLog = [];
-        quarterTimer = 600;
-        quarter = 1;
-        logActivity('Timer reset.');
-        render();
-        saveDataToLocal();
+    function resetGame() {
+        showModal('Are you sure you want to start a new game? All progress will be lost.', 'confirm', (confirmed) => {
+            if (confirmed) {
+                if (timerInterval) pauseTimer(false);
+                
+                // Reset to initial state
+                players = JSON.parse(JSON.stringify(initialPlayers));
+                activityLog = [];
+                quarterTimer = 600;
+                quarter = 1;
+                history = [];
+
+                logActivity('New game started.');
+                render();
+                saveDataToLocal();
+            }
+        });
     }
 
-    // --- CUSTOM MODAL ---
     function showModal(text, type = 'alert', callback = null) {
-        const existingModal = document.getElementById('modal-backdrop');
+        // Remove any existing modals first
+        const existingModal = document.querySelector('.modal-backdrop');
         if (existingModal) existingModal.remove();
 
-        const modalBackdrop = document.createElement('div');
-        modalBackdrop.id = 'modal-backdrop';
-        modalBackdrop.className = 'modal-backdrop';
+        const backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
 
-        let buttonsHtml = '';
-        let inputHtml = '';
+        const modal = document.createElement('div');
+        modal.className = 'modal';
 
+        const modalText = document.createElement('div');
+        modalText.className = 'modal-text';
+        modalText.innerText = text;
+        modal.appendChild(modalText);
+
+        let inputEl = null;
         if (type === 'prompt') {
-            inputHtml = `<input type="number" id="modal-input" class="modal-input" placeholder="#">`;
+            inputEl = document.createElement('input');
+            inputEl.className = 'modal-input';
+            inputEl.type = 'text';
+            modal.appendChild(inputEl);
         }
 
-        if (type === 'alert') {
-            buttonsHtml = `<button class="modal-button primary" id="modal-ok">OK</button>`;
-        } else if (type === 'confirm' || type === 'prompt') {
-            buttonsHtml = `
-                <button class="modal-button" id="modal-cancel">Cancel</button>
-                <button class="modal-button primary" id="modal-ok">Confirm</button>
-            `;
+        const actions = document.createElement('div');
+        actions.className = 'modal-actions';
+
+        const confirmButton = document.createElement('button');
+        confirmButton.className = 'modal-button primary';
+        confirmButton.innerText = (type === 'confirm' || type === 'prompt') ? 'Confirm' : 'OK';
+        actions.appendChild(confirmButton);
+
+        let cancelButton = null;
+        if (type === 'confirm' || type === 'prompt') {
+            cancelButton = document.createElement('button');
+            cancelButton.className = 'modal-button';
+            cancelButton.innerText = 'Cancel';
+            actions.appendChild(cancelButton);
         }
-
-        modalBackdrop.innerHTML = `
-            <div class="modal panel">
-                <p class="modal-text">${text}</p>
-                ${inputHtml}
-                <div class="modal-actions">
-                    ${buttonsHtml}
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(modalBackdrop);
         
-        requestAnimationFrame(() => modalBackdrop.classList.add('visible'));
+        modal.appendChild(actions);
+        backdrop.appendChild(modal);
+        document.body.appendChild(backdrop);
 
-        const inputEl = modalBackdrop.querySelector('#modal-input');
-        if (inputEl) inputEl.focus();
+        // Animate in
+        setTimeout(() => backdrop.classList.add('visible'), 10);
 
         const closeModal = (result, value = null) => {
-            modalBackdrop.classList.remove('visible');
-            modalBackdrop.addEventListener('transitionend', () => {
-                modalBackdrop.remove();
-                if (callback) callback(result, value);
+            backdrop.classList.remove('visible');
+            backdrop.addEventListener('transitionend', () => {
+                backdrop.remove();
+                if (callback) {
+                    callback(result, value);
+                }
             }, { once: true });
         };
 
-        modalBackdrop.querySelector('#modal-ok').addEventListener('click', () => {
-            const value = type === 'prompt' ? inputEl.value : null;
-            closeModal(true, value);
+        confirmButton.addEventListener('click', () => {
+            closeModal(true, inputEl ? inputEl.value : null);
         });
 
-        if (type === 'confirm' || type === 'prompt') {
-            modalBackdrop.querySelector('#modal-cancel').addEventListener('click', () => closeModal(false));
+        if (cancelButton) {
+            cancelButton.addEventListener('click', () => {
+                closeModal(false);
+            });
+        }
+
+        backdrop.addEventListener('click', (e) => {
+            if (e.target === backdrop) {
+                closeModal(false);
+            }
+        });
+        
+        if (inputEl) {
+            inputEl.focus();
+            inputEl.addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') {
+                    closeModal(true, inputEl.value);
+                }
+                if (e.key === 'Escape') {
+                    closeModal(false);
+                }
+            });
         }
     }
 
-    // Initial setup
+    // --- PDF EXPORT ---
+    function exportStatsToPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        const teamName = teamNameEl.textContent || 'My Team';
+        const date = new Date().toLocaleDateString();
+        const time = new Date().toLocaleTimeString();
+
+        // Header
+        doc.setFontSize(22);
+        doc.setFont('helvetica', 'bold');
+        doc.text(teamName, doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
+        
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Stats Exported: ${date} at ${time}`, doc.internal.pageSize.getWidth() / 2, 30, { align: 'center' });
+
+        // Table Header
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text("Player Stats", 14, 50);
+        
+        doc.autoTable({
+            startY: 55,
+            head: [['Player #', 'Time on Field', 'Goals']],
+            body: players.filter(p => p.number !== null).map(p => {
+                const timeOnField = `${Math.floor(p.totalTimeOnField / 60)}m ${p.totalTimeOnField % 60}s`;
+                return [p.number, timeOnField, p.goals];
+            }),
+            theme: 'striped',
+            headStyles: { fillColor: [46, 204, 113] },
+        });
+
+        // Summary Stats
+        const finalY = doc.autoTable.previous.finalY + 20;
+        const longestOnField = players.length > 0 ? [...players].sort((a, b) => b.totalTimeOnField - a.totalTimeOnField)[0] : null;
+        const mostGoals = players.length > 0 ? [...players].sort((a, b) => b.goals - a.goals)[0] : null;
+
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text("Summary", 14, finalY);
+
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'normal');
+        if (longestOnField) {
+            const timeStr = `(${Math.floor(longestOnField.totalTimeOnField / 60)}m ${longestOnField.totalTimeOnField % 60}s)`;
+            doc.text(`Longest on Field: Player #${longestOnField.number || 'N/A'} ${timeStr}`, 14, finalY + 10);
+        }
+        if (mostGoals) {
+            doc.text(`Most Goals: Player #${mostGoals.number || 'N/A'} (${mostGoals.goals} goals)`, 14, finalY + 20);
+        }
+
+        doc.save(`${teamName.replace(/\s/g, '_')}-Stats.pdf`);
+    }
+
+    // --- INITIALIZATION ---
     loadDataFromLocal();
-    setupTabs();
     render();
+    setupTabs();
+    setupDragAndDrop();
 }); 

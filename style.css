@@ -150,6 +150,17 @@ aside {
     border-color: rgba(46, 204, 113, 0.7);
 }
 
+.player-card.dragging {
+    opacity: 0.5;
+    transform: scale(0.95) rotate(3deg);
+    cursor: grabbing;
+}
+
+#field-players.drag-over, #bench-players.drag-over {
+    background-color: rgba(46, 204, 113, 0.1);
+    border: 2px dashed rgba(46, 204, 113, 0.5);
+}
+
 .player-card.on-field {
     background-color: #2ecc71; /* Initial green state */
     transition: background-color 1s linear;
@@ -180,6 +191,16 @@ aside {
 
 .player-card.fatigued {
     animation: flashRedAndWhite 1s infinite;
+}
+
+@keyframes pulseGreen {
+    0% { box-shadow: 0 0 8px 4px rgba(46, 204, 113, 0.5); }
+    50% { box-shadow: 0 0 16px 8px rgba(46, 204, 113, 0.8); }
+    100% { box-shadow: 0 0 8px 4px rgba(46, 204, 113, 0.5); }
+}
+
+.player-card.on-fire {
+    animation: pulseGreen 1.5s infinite;
 }
 
 /* Player Card Content */
@@ -304,8 +325,8 @@ aside {
 }
 
 .timer-controls button:hover {
-    background: rgba(46, 204, 113, 0.7);
-    border-color: rgba(46, 204, 113, 1);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
 }
 
 /* Stats and Log */
@@ -602,4 +623,39 @@ aside {
         padding: 10px 8px;
         font-size: 0.9em;
     }
+}
+
+.export-controls {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#export-pdf-button {
+    width: 100%;
+    padding: 12px;
+    font-size: 1em;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(145deg, #27ae60, #229954);
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+#export-pdf-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(145deg, #2ecc71, #27ae60);
+}
+
+.stats-grid, .log-list {
+    list-style: none;
+    padding: 0;
 } 
